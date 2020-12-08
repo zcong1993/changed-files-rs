@@ -1,7 +1,4 @@
-# changed-files-rs
-
-![Release](https://github.com/zcong1993/changed-files-rs/workflows/Release/badge.svg)
-[![version](https://img.shields.io/crates/v/changed-files-rs.svg?colorB=319e8c)](https://crates.io/crates/changed-files-rs)
+# changed-files-rs ![Release](https://github.com/zcong1993/changed-files-rs/workflows/Release/badge.svg) [![version](https://img.shields.io/crates/v/changed-files-rs.svg?colorB=319e8c)](https://crates.io/crates/changed-files-rs)
 
 > rust port jest-changed-files
 
