@@ -6,6 +6,24 @@ on:
       - 'v*'
 
 jobs:
+  # Publish starship to Crates.io
+  cargo_publish:
+    name: Publish Cargo Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup | Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup | Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Build | Publish
+        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+
   build:
     name: Build release binaries
     strategy:
@@ -73,8 +91,23 @@ jobs:
         run: for file in changed-files-rs-*/changed-files-rs-*; do openssl dgst -sha256 -r "$file" | awk '{print $1}' > "${file}.sha256"; done
 
       - name: Build | Publish
+        id: gh-release
         uses: softprops/action-gh-release@v1
         with:
           files: changed-files-rs-*/changed-files-rs-*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: transform
+        id: transform
+        run: |
+          origin=${{ steps.gh-release.outputs.url }}
+          base=${origin/tag/download}
+          echo "::set-output name=url::$base/changed-files-rs-x86_64-apple-darwin.tar.gz"
+      - name: Update brew formula
+        uses: mislav/bump-homebrew-formula-action@v1
+        with:
+          formula-name: changed-files-rs
+          homebrew-tap: zcong1993/homebrew-tap
+          download_url: ${{ steps.transform.outputs.url }}
+        env:
+          COMMITTER_TOKEN: ${{ secrets.PAT }}
