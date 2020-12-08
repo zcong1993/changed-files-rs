@@ -40,11 +40,8 @@ jobs:
           profile: minimal
           target: ${{ matrix.target }}
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: build
-          args: --release --target=${{ matrix.target }}
+      - name: Build | Build
+        run: cargo build --release --target ${{ matrix.target }}
       - name: Post Setup | Prepare artifacts [-nix]
         run: |
           cd target/${{ matrix.target }}/release
