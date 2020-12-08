@@ -1,7 +1,9 @@
-name: Cargo Build
+name: Release
 
 on:
   push:
+    tags:
+      - 'v*'
 
 jobs:
   build:
@@ -53,3 +55,26 @@ jobs:
         with:
           name: ${{ matrix.name }}
           path: ${{ matrix.name }}
+  # Create GitHub release with Rust build targets
+  github_release:
+    name: Create GitHub Release
+    needs: github_build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup | Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup | Artifacts
+        uses: actions/download-artifact@v2
+
+      - name: Setup | Checksums
+        run: for file in changed-files-rs-*/changed-files-rs-*; do openssl dgst -sha256 -r "$file" | awk '{print $1}' > "${file}.sha256"; done
+
+      - name: Build | Publish
+        uses: softprops/action-gh-release@v1
+        with:
+          files: changed-files-rs-*/changed-files-rs-*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
