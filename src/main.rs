@@ -10,7 +10,7 @@ struct Opt {
     changed_since: Option<String>,
 }
 
-fn get_changed_and_filter(cwd: &path::Path, args: &[&str], re: &Option<Regex>) -> Vec<String> {
+fn get_changed_and_filter(cwd: &path::PathBuf, args: &[&str], re: &Option<Regex>) -> Vec<String> {
     let capture = Exec::cmd("git")
         .args(args)
         .cwd(cwd)
@@ -59,11 +59,11 @@ fn find_changed_files(cwd: &path::PathBuf, opt: &Opt, reg: &Option<Regex>) -> Ve
         let r1 = reg.clone();
         let r2 = reg.clone();
         let staged_t = thread::spawn(move || {
-            get_changed_and_filter(c1.as_path(), &["diff", "--cached", "--name-only"], &r1)
+            get_changed_and_filter(&c1, &["diff", "--cached", "--name-only"], &r1)
         });
         let unstaged_t = thread::spawn(move || {
             get_changed_and_filter(
-                c2.as_path(),
+                &c2,
                 &["ls-files", "--other", "--modified", "--exclude-standard"],
                 &r2,
             )
@@ -91,7 +91,7 @@ fn find_changed_files(cwd: &path::PathBuf, opt: &Opt, reg: &Option<Regex>) -> Ve
 
     let committed_t = thread::spawn(move || {
         get_changed_and_filter(
-            c1.as_path(),
+            &c1,
             &[
                 "diff",
                 "--name-only",
@@ -101,11 +101,11 @@ fn find_changed_files(cwd: &path::PathBuf, opt: &Opt, reg: &Option<Regex>) -> Ve
         )
     });
     let staged_t = thread::spawn(move || {
-        get_changed_and_filter(c2.as_path(), &["diff", "--cached", "--name-only"], &r2)
+        get_changed_and_filter(&c2, &["diff", "--cached", "--name-only"], &r2)
     });
     let unstaged_t = thread::spawn(move || {
         get_changed_and_filter(
-            c3.as_path(),
+            &c3,
             &["ls-files", "--other", "--modified", "--exclude-standard"],
             &r3,
         )
