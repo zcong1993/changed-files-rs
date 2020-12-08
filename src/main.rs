@@ -119,7 +119,7 @@ fn find_changed_files(cwd: &path::PathBuf, opt: &Opt, reg: &Option<Regex>) -> Ve
 }
 
 fn main() {
-    let matches = App::new("cf-rs")
+    let matches = App::new("changed-files-rs")
         .about("get git repo modified files")
         .arg(
             Arg::new("last_commit")
