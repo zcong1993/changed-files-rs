@@ -108,6 +108,6 @@ jobs:
         with:
           formula-name: changed-files-rs
           homebrew-tap: zcong1993/homebrew-tap
-          download_url: ${{ steps.transform.outputs.url }}
+          download-url: ${{ steps.transform.outputs.url }}
         env:
           COMMITTER_TOKEN: ${{ secrets.PAT }}
