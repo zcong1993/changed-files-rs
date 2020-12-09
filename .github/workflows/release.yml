@@ -33,6 +33,7 @@ jobs:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
           - x86_64-apple-darwin
+          - x86_64-pc-windows-msvc
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
@@ -43,6 +44,9 @@ jobs:
           - target: x86_64-apple-darwin
             os: macOS-latest
             name: changed-files-rs-x86_64-apple-darwin.tar.gz
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            name: changed-files-rs-x86_64-pc-windows-msvc.zip
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -62,7 +66,15 @@ jobs:
           override: true
       - name: Build | Build
         run: cargo build --release --target ${{ matrix.target }}
+      - name: Post Setup | Prepare artifacts [Windows]
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          strip changed-files-rs.exe
+          7z a ../../../${{ matrix.name }} changed-files-rs.exe
+          cd -
       - name: Post Setup | Prepare artifacts [-nix]
+        if: matrix.os != 'windows-latest'
         run: |
           cd target/${{ matrix.target }}/release
           strip changed-files-rs
@@ -97,7 +109,7 @@ jobs:
           files: changed-files-rs-*/changed-files-rs-*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: transform
+      - name: Transform gh release url
         id: transform
         run: |
           origin=${{ steps.gh-release.outputs.url }}
