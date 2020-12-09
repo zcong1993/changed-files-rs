@@ -54,6 +54,7 @@ jobs:
           7z a ../../../${{ matrix.name }} changed-files-rs.exe
           cd -
       - name: Post Setup | Prepare artifacts [-nix]
+        if: matrix.os != 'windows-latest'
         run: |
           cd target/${{ matrix.target }}/release
           strip changed-files-rs
