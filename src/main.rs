@@ -10,10 +10,17 @@ struct Opt {
     changed_since: Option<String>,
 }
 
-fn get_changed_and_filter(cwd: &path::PathBuf, args: &[&str], re: &Option<Regex>) -> Vec<String> {
+#[derive(Debug)]
+struct GitCmd {
+    cwd: path::PathBuf,
+    args: Vec<String>,
+    reg: Option<Regex>,
+}
+
+fn get_changed_and_filter(cmd: GitCmd) -> Vec<String> {
     let capture = Exec::cmd("git")
-        .args(args)
-        .cwd(cwd)
+        .args(&cmd.args)
+        .cwd(&cmd.cwd)
         .stderr(Redirection::None)
         .capture();
 
@@ -25,17 +32,17 @@ fn get_changed_and_filter(cwd: &path::PathBuf, args: &[&str], re: &Option<Regex>
                 if x == "" {
                     return false;
                 }
-                let r = re.clone();
-                match r {
+
+                match &cmd.reg {
                     Some(re) => re.is_match(x),
                     None => true,
                 }
             })
-            .map(|x| cwd.join(x).as_path().to_str().unwrap().to_string())
+            .map(|x| cmd.cwd.join(x).as_path().to_str().unwrap().to_string())
             .collect(),
         Err(e) => {
             println!("run error {}", e);
-            return vec![];
+            vec![]
         }
     }
 }
@@ -52,70 +59,67 @@ fn combine_unique(vecs: Vec<Vec<String>>) -> Vec<String> {
         .collect()
 }
 
-fn find_changed_files(cwd: &path::PathBuf, opt: &Opt, reg: &Option<Regex>) -> Vec<String> {
-    if opt.changed_since.is_none() && !opt.last_commit && !opt.with_ancestor {
-        let c1 = cwd.clone();
-        let c2 = cwd.clone();
-        let r1 = reg.clone();
-        let r2 = reg.clone();
-        let staged_t = thread::spawn(move || {
-            get_changed_and_filter(&c1, &["diff", "--cached", "--name-only"], &r1)
-        });
-        let unstaged_t = thread::spawn(move || {
-            get_changed_and_filter(
-                &c2,
-                &["ls-files", "--other", "--modified", "--exclude-standard"],
-                &r2,
-            )
-        });
+fn find_changed_files(cwd: path::PathBuf, opt: &Opt, reg: Option<Regex>) -> Vec<String> {
+    let mut cmds: Vec<GitCmd> = Vec::new();
 
-        return combine_unique(vec![staged_t.join().unwrap(), unstaged_t.join().unwrap()]);
+    // staged
+    cmds.push(GitCmd {
+        cwd: cwd.clone(),
+        args: Vec::from([
+            "diff".to_string(),
+            "--cached".to_string(),
+            "--name-only".to_string(),
+        ]),
+        reg: reg.clone(),
+    });
+
+    // unstaged
+    cmds.push(GitCmd {
+        cwd: cwd.clone(),
+        args: Vec::from([
+            "ls-files".to_string(),
+            "--other".to_string(),
+            "--modified".to_string(),
+            "--exclude-standard".to_string(),
+        ]),
+        reg: reg.clone(),
+    });
+
+    if !(opt.changed_since.is_none() && !opt.last_commit && !opt.with_ancestor) {
+        if opt.last_commit {
+            cmds.push(GitCmd {
+                cwd: cwd.clone(),
+                args: Vec::from([
+                    "show".to_string(),
+                    "--name-only".to_string(),
+                    "--pretty=format:".to_string(),
+                    "HEAD".to_string(),
+                ]),
+                reg: reg.clone(),
+            });
+        }
+
+        let changed_since = opt.changed_since.clone().unwrap_or("HAED^".to_string());
+        cmds.push(GitCmd {
+            cwd: cwd.clone(),
+            args: Vec::from(["diff".to_string(), "--name-only".to_string(), changed_since]),
+            reg: reg.clone(),
+        });
     }
 
-    if opt.last_commit {
-        return get_changed_and_filter(
-            cwd,
-            &["show", "--name-only", "--pretty=format:", "HEAD"],
-            reg,
-        );
+    let mut children = vec![];
+
+    for cmd in cmds {
+        children.push(thread::spawn(move || get_changed_and_filter(cmd)));
     }
 
-    let c1 = cwd.clone();
-    let c2 = cwd.clone();
-    let c3 = cwd.clone();
-    let r1 = reg.clone();
-    let r2 = reg.clone();
-    let r3 = reg.clone();
+    let mut res = vec![];
 
-    let changed_since = opt.changed_since.clone().unwrap_or("HAED^".to_string());
+    for child in children {
+        res.push(child.join().unwrap());
+    }
 
-    let committed_t = thread::spawn(move || {
-        get_changed_and_filter(
-            &c1,
-            &[
-                "diff",
-                "--name-only",
-                format!("{}...HEAD", changed_since.as_str()).as_str(),
-            ],
-            &r1,
-        )
-    });
-    let staged_t = thread::spawn(move || {
-        get_changed_and_filter(&c2, &["diff", "--cached", "--name-only"], &r2)
-    });
-    let unstaged_t = thread::spawn(move || {
-        get_changed_and_filter(
-            &c3,
-            &["ls-files", "--other", "--modified", "--exclude-standard"],
-            &r3,
-        )
-    });
-
-    combine_unique(vec![
-        committed_t.join().unwrap(),
-        staged_t.join().unwrap(),
-        unstaged_t.join().unwrap(),
-    ])
+    combine_unique(res)
 }
 
 fn main() {
@@ -165,7 +169,7 @@ fn main() {
     let reg = matches.value_of("filter").map(|x| Regex::new(x).unwrap());
     let cwd = env::current_dir().unwrap();
 
-    let mut res = find_changed_files(&cwd, o, &reg);
+    let mut res = find_changed_files(cwd, o, reg);
 
     if matches.is_present("folder") {
         res = res
